@@ -1,5 +1,10 @@
-import os
+os.environ["YOLO_OPENCV"] = "0"
 os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
+
+# Mock cv2 module to prevent import errors
+import sys, types
+cv2 = types.ModuleType("cv2")
+sys.modules["cv2"] = cv2
 
 import streamlit as st
 from ultralytics import YOLO
@@ -58,4 +63,5 @@ if img_file is not None:
             conf = float(box.conf[0]) * 100
 
             st.write(f"🔹 **{label}** ({conf:.2f}% confidence)")
+
 
