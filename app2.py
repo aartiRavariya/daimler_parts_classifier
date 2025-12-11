@@ -1,3 +1,4 @@
+import os
 os.environ["YOLO_OPENCV"] = "0"
 os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
 
@@ -63,5 +64,6 @@ if img_file is not None:
             conf = float(box.conf[0]) * 100
 
             st.write(f"🔹 **{label}** ({conf:.2f}% confidence)")
+
 
 
