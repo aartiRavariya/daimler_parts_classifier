@@ -1,61 +1,59 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Dec  7 22:49:04 2025
-
-@author: hbukke
-"""
+# streamlit_yolo_app.py
 
 import streamlit as st
-import torch
-from torchvision import transforms, models
+from ultralytics import YOLO
 from PIL import Image
-import io
+import numpy as np
+import tempfile
 
-checkpoint = torch.load("daimler_parts_classifier.pth", map_location="cpu")
-class_names = checkpoint["class_names"]
+st.title("Daimler Parts Detector (YOLO Model)")
+st.write("Upload or capture an image to detect parts.")
 
-model = models.efficientnet_b0(weights=None)
-model.classifier[1] = torch.nn.Sequential(
-    torch.nn.Dropout(0.4),
-    torch.nn.Linear(model.classifier[1].in_features, len(class_names))
-)
-model.load_state_dict(checkpoint["model_state"])
-model.eval()
+# ------------------ LOAD YOLO MODEL ------------------
+@st.cache_resource
+def load_model():
+    model = YOLO("best.pt")   # update path if needed
+    return model
 
-# ---------- TRANSFORMS ----------
-transform = transforms.Compose([
-    transforms.Resize((300, 300)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406],
-                         [0.229, 0.224, 0.225])
-])
+model = load_model()
 
-# ---------- STREAMLIT UI ----------
-st.title("Daimler Parts Classifier")
-st.write("Upload an image to classify its part type.")
-
+# ------------------ INPUT ------------------
 img_file = st.camera_input("Take a picture")
 
 if img_file is None:
-    img_file = st.file_uploader("Or upload from gallery", type=["jpg","jpeg","png"])
- 
+    img_file = st.file_uploader("Or upload from gallery", type=["jpg", "jpeg", "png"])
+
 if img_file is not None:
-    img = Image.open(img_file)
+    # Streamlit gives image as BytesIO → save temporarily
+    temp = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+    temp.write(img_file.getvalue())
+    temp.flush()
 
-# uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
-
-
-if img_file:
+    # Display image
     image = Image.open(img_file).convert("RGB")
-    st.image(image, caption="Selected Image", use_column_width=True)
+    st.image(image, caption="Uploaded Image", use_column_width=True)
 
-    # Preprocess
-    img_tensor = transform(image).unsqueeze(0)
+    # ------------------ RUN YOLO DETECTION ------------------
+    results = model.predict(temp.name, conf=0.25)
 
-    with torch.no_grad():
-        outputs = model(img_tensor)
-        _, pred = torch.max(outputs, 1)
-        predicted_label = class_names[pred.item()]
+    # results[0] contains detection info
+    res = results[0]
 
-    st.success(f"Predicted Class: **{predicted_label}**") 
+    # Save image with bounding boxes
+    boxed_img_path = temp.name.replace(".jpg", "_pred.jpg")
+    res.save(filename=boxed_img_path)
 
+    st.image(boxed_img_path, caption="Detections", use_column_width=True)
+
+    # ------------------ DISPLAY DETECTED LABELS ------------------
+    st.subheader("Detected Parts:")
+
+    if len(res.boxes) == 0:
+        st.warning("No objects detected.")
+    else:
+        for box in res.boxes:
+            cls = int(box.cls[0])
+            label = res.names[cls]
+            conf = float(box.conf[0]) * 100
+
+            st.write(f"🔹 **{label}** ({conf:.2f}% confidence)")
