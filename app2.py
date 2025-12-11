@@ -1,4 +1,5 @@
-# streamlit_yolo_app.py
+import os
+os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
 
 import streamlit as st
 from ultralytics import YOLO
@@ -57,3 +58,4 @@ if img_file is not None:
             conf = float(box.conf[0]) * 100
 
             st.write(f"🔹 **{label}** ({conf:.2f}% confidence)")
+
